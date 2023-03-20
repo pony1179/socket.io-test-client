@@ -1,14 +1,20 @@
 const http = require('http');
 const express = require('express');
 const io_client = require('socket.io-client');
+const bodyParser = require('body-parser');
 
 const app = express();
 
+let socket = null;
+let logined = false;
 const socketPool = new Map();
 const socketIndexPool = new Map();
 const arguments = process.argv;
 const port = arguments[2] || 4000;
-let socket = null;
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json({ limit: '50mb' }));
+
 if (!socketPool.has(port)) {
     socket = io_client(`http://127.0.0.1:8000/server`); // nginx 代理端口，会代理到不同的 socket 服务
     socket.on('connect', () => {
@@ -27,12 +33,25 @@ if (!socketPool.has(port)) {
     });
 }
 app.post('/message', (req, res) => {
+    if (!logined) {
+        res.send('not logined');
+        return;
+    }
     socket.emit('message', {
         name: 'wang',
         fromPort: port
     });
     res.send('ok');
 });
+app.post('/login', (req, res) => {
+    const userId = req.body.userId;
+    socket.emit('join', userId);
+    logined = true;
+    res.send('ok');
+});
+
+
+
 const server = http.Server(app);
 server.listen(port, () => {
     console.log('listening on port ' + port);
